@@ -8,10 +8,10 @@ Vagrant.configure("2") do |config|
   config.vm.box = "ubuntu/bionic64"
 
   config.vm.define "mysqldb" do |mysql|
-    mysql.vm.network "private_network", ip: "192.168.50.4"
+    mysql.vm.network "private_network", ip: "192.168.50.3"
 
     mysql.vm.provision "shell",
-      inline: "cat /configs/id_bionic.pub >> .ssh/authorized_keys"
+      inline: "cat /configs/key.pub >> .ssh/authorized_keys"
     mysql.vm.provision "shell", inline: $script_mysql
     mysql.vm.provision "shell",
       inline: "cat /configs/mysqld.cnf > /etc/mysql/mysql.conf.d/mysqld.cnf"
@@ -22,10 +22,11 @@ Vagrant.configure("2") do |config|
 
     end
   end
+
 Vagrant.configure("2") do |config|
   config.vm.define "phpweb" do |phpweb|
-     phpweb.vm.network "forwarded_port", guest:80, host:8089
-     phpweb.vm.network "public_network", ip: "192.168.1.25"
+     phpweb.vm.network "forwarded_port", guest:80, host:8090
+     phpweb.vm.network "private_network", ip: "192.168.50.4"
 
      phpweb.vm.provision "shell",
         inline: "apt-get update && apt-get install -y puppet"
@@ -35,23 +36,30 @@ Vagrant.configure("2") do |config|
          puppet.manifest_file = "phpweb.pp"
         end
     end
+end
 
 Vagrant.configure("2") do |config|
   config.vm.define "mysqlserver" do |mysqlserver|
-    mysqlserver.vm.network "public_network", ip: "192.168.1.84"
-  end
+    mysqlserver.vm.network "private_network", ip: "192.168.50.5"
+
+    mysqlserver.vm.provision "shell", inline: "cat /vagrant/configs/id_bionic.pub >> .ssh/authorized_keys"
+end
 
   config.vm.define "ansible" do |ansible|
-    ansible.vm.network "public_network", ip: "192.168.1.26"
+    ansible.vm.network "private_network", ip: "192.168.50.7"
+
     ansible.vm.provision "shell",
       inline: "apt-get update && \
                 apt-get install -y software-properties-common && \
                 apt-add-repository --yes --update ppa:ansible/ansible && \
                 apt-get install -y ansible"
 
-   ansible.vm.provision "shell",
+    ansible.vm.provision "shell",
+      inline: "cp /vagrant/key /home/vagrant/key && \
+                              chmod 600 /home/vagrant/key"
+
+    ansible.vm.provision "shell",
       inline: "ansible-playbook -i /vagrant/configs/ansible/hosts \
-      /vagrant/configs/ansible/playbook.yml"
-    end
+                                /vagrant/configs/ansible/playbook.yml"
   end
 end
